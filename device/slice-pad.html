@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SLICE Pad</title>
+<style>
+:root {
+  --bg: #0b0d12;
+  --crust-light: #f4d28b;
+  --crust-dark: #7a4818;
+  --cheese: #ffd24a;
+  --pepperoni: #b81f1f;
+  --blade: #cfd4dc;
+  --handle: #3a2410;
+  --text: #d6d9df;
+  --muted: #6b7280;
+  --accent: #5b8cff;
+  --hit: #4ec47e;
+}
+* { box-sizing: border-box; }
+html, body {
+  height: 100%; margin: 0; background: var(--bg); color: var(--text);
+  font: 11px/1.35 'JetBrains Mono', Consolas, monospace; overflow: hidden;
+  user-select: none;
+}
+.wrap { display: flex; height: 100%; }
+.pizza-pane { flex: 0 0 160px; display: flex; align-items: center; justify-content: center; }
+.right-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.head { padding: 4px 8px; background: #11141b; border-bottom: 1px solid #1c2230;
+  display: flex; justify-content: space-between; font-size: 10px; line-height: 16px; }
+.head .title { color: var(--accent); letter-spacing: 0.08em; font-weight: 600; }
+.head .status { color: var(--muted); }
+.head .status.ok { color: var(--hit); }
+.head .status.err { color: var(--pepperoni); }
+
+.pizza { position: relative; width: 150px; height: 150px; }
+.pizza svg { display: block; width: 100%; height: 100%; }
+.slice-path { cursor: pointer; transition: filter 0.1s; }
+.slice-path:hover { filter: brightness(1.2); }
+.slice-path.active { filter: brightness(1.5) drop-shadow(0 0 6px var(--hit)); }
+.slice-label { pointer-events: none; font: 600 7px sans-serif; fill: #1a0e05; text-anchor: middle; }
+
+.log { flex: 1; overflow-y: auto; padding: 3px 8px; min-height: 0; }
+.log::-webkit-scrollbar { width: 4px; }
+.log::-webkit-scrollbar-thumb { background: #2a3040; border-radius: 2px; }
+.msg { margin: 0 0 2px; white-space: pre-wrap; word-wrap: break-word; }
+.msg .ts { color: var(--muted); margin-right: 4px; font-size: 9px; }
+.msg .lbl { display: inline-block; min-width: 40px; margin-right: 4px; font-weight: 600; font-size: 9px; }
+.msg.you .lbl { color: var(--cheese); }
+.msg.claude .lbl { color: var(--accent); }
+.msg.sys .lbl { color: var(--muted); }
+.msg.hit .lbl { color: var(--hit); }
+.msg.err .lbl { color: var(--pepperoni); }
+.msg.step { color: var(--muted); font-style: italic; opacity: 0.7; }
+
+.input-wrap { flex: 0 0 auto; padding: 3px 8px; border-top: 1px solid #1c2230; background: #11141b; }
+.input { display: flex; align-items: center; gap: 6px; }
+.input .prompt { color: var(--accent); }
+#ta { flex: 1; background: transparent; border: none; outline: none; color: var(--text);
+  font: inherit; resize: none; padding: 2px 0; max-height: 60px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pizza-pane">
+    <div class="pizza" id="pizza"></div>
+  </div>
+
+  <div class="right-pane">
+    <div class="head">
+      <span><span class="title">SLICE</span> · click a slice to fire its clip</span>
+      <span id="status" class="status">…</span>
+    </div>
+    <div id="log" class="log"></div>
+    <div class="input-wrap">
+      <div class="input">
+        <span class="prompt">&gt;</span>
+        <textarea id="ta" rows="1" placeholder="message · enter sends · / for commands"></textarea>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+const CH_URL = 'http://127.0.0.1:3000';
+const CH_NS  = '/hub';
+
+// Channels arranged radially. Each maps to a track name and a clip slot.
+// Users can re-config this list at runtime via the bridge.
+const CHANNELS = [
+  { name: 'KICK',     short: 'KCK', clip: 0 },
+  { name: 'SNARE',    short: 'SNR', clip: 0 },
+  { name: 'HH CLOSED',short: 'HHC', clip: 0 },
+  { name: 'CRASH',    short: 'CSH', clip: 0 },
+  { name: 'SUB 1',    short: 'SUB', clip: 0 },
+  { name: 'SYNTH 1',  short: 'S1',  clip: 0 },
+  { name: 'SYNTH 2',  short: 'S2',  clip: 0 },
+  { name: 'SYNTH 3',  short: 'S3',  clip: 0 },
+  { name: 'SYNTH 4',  short: 'S4',  clip: 0 },
+  { name: 'SYNTH 5',  short: 'S5',  clip: 0 },
+  { name: 'SYNTH 6',  short: 'S6',  clip: 0 },
+  { name: 'VOX',      short: 'VOX', clip: 0 },
+];
+
+// ---------- pizza SVG render ----------
+function buildPizza() {
+  const pizza = document.getElementById('pizza');
+  const N = CHANNELS.length;
+  const cx = 75, cy = 75, r = 60;
+  const colors = ['#ffd24a','#f4d28b','#e8b85a','#d49a3c'];
+  const sweepDeg = 360 / N;
+
+  let svg = `<svg viewBox="0 0 150 150">
+    <!-- crust outer ring -->
+    <circle cx="${cx}" cy="${cy}" r="${r+4}" fill="#7a4818" stroke="#3d1d0a" stroke-width="1"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#c98b3a"/>`;
+
+  // Each slice
+  for (let i = 0; i < N; i++) {
+    const a0 = (i * sweepDeg - 90) * Math.PI / 180;
+    const a1 = ((i+1) * sweepDeg - 90) * Math.PI / 180;
+    const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
+    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+    const largeArc = sweepDeg > 180 ? 1 : 0;
+    const d = `M ${cx} ${cy} L ${x0} ${y0} A ${r} ${r} 0 ${largeArc} 1 ${x1} ${y1} Z`;
+    const color = colors[i % colors.length];
+    svg += `<path class="slice-path" data-idx="${i}" d="${d}" fill="${color}" stroke="#7a4818" stroke-width="0.8"/>`;
+    // pepperoni spot per slice
+    const am = (a0 + a1) / 2;
+    const pr = r * 0.55;
+    const px = cx + pr * Math.cos(am), py = cy + pr * Math.sin(am);
+    svg += `<circle cx="${px}" cy="${py}" r="3.2" fill="#b81f1f" pointer-events="none"/>`;
+    // label
+    const lr = r * 0.78;
+    const lx = cx + lr * Math.cos(am), ly = cy + lr * Math.sin(am) + 2;
+    svg += `<text class="slice-label" x="${lx}" y="${ly}">${CHANNELS[i].short}</text>`;
+  }
+
+  // The blade — diagonal across one edge
+  svg += `<g transform="translate(0,0)">
+    <path d="M 10 75 L 75 10 L 80 18 L 18 80 Z" fill="#cfd4dc" stroke="#3a3f48" stroke-width="0.8" opacity="0.85" pointer-events="none"/>
+    <line x1="10" y1="75" x2="75" y2="10" stroke="#fff" stroke-width="1" opacity="0.6" pointer-events="none"/>
+    <rect x="68" y="2" width="32" height="6" rx="2" fill="#3a2410" transform="rotate(-45 80 10)" pointer-events="none"/>
+  </g>`;
+
+  svg += `</svg>`;
+  pizza.innerHTML = svg;
+
+  // Click handlers
+  pizza.querySelectorAll('.slice-path').forEach(p => {
+    p.addEventListener('click', () => {
+      const idx = parseInt(p.dataset.idx, 10);
+      fireSlice(idx, p);
+    });
+  });
+}
+
+// ---------- chat ----------
+const log = document.getElementById('log');
+const ta  = document.getElementById('ta');
+const status = document.getElementById('status');
+
+const hx   = s => Array.from(new TextEncoder().encode(String(s))).map(b => b.toString(16).padStart(2,'0')).join('');
+const unhx = s => {
+  try {
+    const m = String(s).match(/.{1,2}/g) || [];
+    return new TextDecoder('utf-8').decode(Uint8Array.from(m, b => parseInt(b, 16)));
+  } catch { return String(s); }
+};
+
+function ts() {
+  const d = new Date();
+  const z = n => String(n).padStart(2, '0');
+  return `${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
+}
+
+function addMsg(kind, label, text) {
+  const div = document.createElement('div');
+  div.className = `msg ${kind}`;
+  div.innerHTML = `<span class="ts">${ts()}</span><span class="lbl">${label}</span><span class="txt"></span>`;
+  div.querySelector('.txt').textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  while (log.childElementCount > 200) log.firstChild.remove();
+}
+
+function setStatus(text, cls) {
+  status.textContent = text;
+  status.className = 'status ' + (cls || '');
+}
+
+function autosize() {
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 60) + 'px';
+}
+ta.addEventListener('input', autosize);
+ta.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const text = ta.value.trim();
+    if (!text) return;
+    addMsg('you', 'YOU', text);
+    socket.emit('control', { mode:'push', target:'all', header:'claudeIn', values:[hx(text)] });
+    ta.value = '';
+    autosize();
+  }
+});
+
+// ---------- socket ----------
+const socket = io(CH_URL + CH_NS, { transports: ['websocket'], reconnection: true });
+
+socket.on('connect', () => {
+  setStatus('online', 'ok');
+  socket.emit('addUsername', { username: 'slice-pad' });
+});
+socket.on('disconnect', () => setStatus('offline', 'err'));
+socket.on('connect_error', e => setStatus('err: ' + e.message, 'err'));
+
+socket.on('control', d => {
+  const v = unhx((d.values && d.values[0]) || '');
+  if (d.header === 'claudeOut')         addMsg('claude', 'CLAUDE', v);
+  else if (d.header === 'claudeStep')   addMsg('step', '···', v);
+  else if (d.header === 'claudeStatus') setStatus(v || 'busy');
+  else if (d.header === 'fireAck')      addMsg('hit', 'HIT', v);
+});
+
+// ---------- slice fire ----------
+function fireSlice(idx, el) {
+  const ch = CHANNELS[idx];
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 400);
+  addMsg('hit', 'FIRE', `${ch.name} (clip ${ch.clip})`);
+  // Tell bridge to fire this channel's clip — bridge resolves name->index + calls AbletonOSC
+  socket.emit('control', {
+    mode: 'push', target: 'all',
+    header: 'fireSlice',
+    values: [hx(JSON.stringify({ name: ch.name, clip: ch.clip }))],
+  });
+}
+
+buildPizza();
+window.addEventListener('load', () => ta.focus());
+</script>
+</body>
+</html>

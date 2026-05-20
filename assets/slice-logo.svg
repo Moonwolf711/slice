@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="crust" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f4d28b"/>
+      <stop offset="80%" stop-color="#c98b3a"/>
+      <stop offset="100%" stop-color="#7a4818"/>
+    </radialGradient>
+    <linearGradient id="blade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5f5f7"/>
+      <stop offset="50%" stop-color="#cfd4dc"/>
+      <stop offset="100%" stop-color="#6d7480"/>
+    </linearGradient>
+    <linearGradient id="handle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3a2410"/>
+      <stop offset="100%" stop-color="#1a0e05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- pizza slice wedge -->
+  <path d="M 200 200 L 60 320 A 180 180 0 0 0 340 320 Z" fill="url(#crust)" stroke="#3d1d0a" stroke-width="3"/>
+
+  <!-- cheese highlights -->
+  <path d="M 200 200 L 100 290 A 140 140 0 0 0 300 290 Z" fill="#ffd24a" opacity="0.75" stroke="none"/>
+
+  <!-- pepperoni -->
+  <circle cx="155" cy="280" r="14" fill="#b81f1f"/>
+  <circle cx="245" cy="280" r="14" fill="#b81f1f"/>
+  <circle cx="200" cy="310" r="13" fill="#b81f1f"/>
+  <circle cx="125" cy="305" r="10" fill="#b81f1f"/>
+  <circle cx="275" cy="305" r="10" fill="#b81f1f"/>
+  <circle cx="200" cy="250" r="11" fill="#b81f1f"/>
+
+  <!-- blade (sweep from upper-left of slice) -->
+  <path d="M 60 320 L 200 200 L 220 175 L 80 295 Z" fill="url(#blade)" stroke="#3a3f48" stroke-width="2"/>
+  <!-- blade edge highlight -->
+  <line x1="60" y1="320" x2="200" y2="200" stroke="#ffffff" stroke-width="2" opacity="0.7"/>
+
+  <!-- handle -->
+  <rect x="200" y="160" width="120" height="22" rx="6" fill="url(#handle)" transform="rotate(-45 200 200)"/>
+  <rect x="208" y="166" width="100" height="3" fill="#8b6b3b" opacity="0.5" transform="rotate(-45 200 200)"/>
+
+  <!-- wordmark -->
+  <text x="200" y="60" text-anchor="middle" font-family="Impact, 'Arial Black', sans-serif"
+        font-size="56" letter-spacing="6" fill="#1a0e05">SLICE</text>
+  <text x="200" y="95" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', monospace"
+        font-size="11" letter-spacing="4" fill="#6d7480">AI MIDI · ABLETON LIVE</text>
+</svg>

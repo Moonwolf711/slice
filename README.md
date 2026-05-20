@@ -1,17 +1,15 @@
 # SLICE
 
-```
-        ░░░░░░░
-      ░░░░░░░░░░░░
-    ░░░░░░░░░░░░░░░░
-  ░░░░░░░░░░░░░░░░░░░░──────█  ← blade
-    ░░░░░░░░░░░░░░░░░░░░░░░░█
-      ░░░░░░░░░░░░░░░░░░░░░░█
-        ░░░░░░░░░░░░░░░░░░░░
-          ░░░░░░░░░░░░░░░░
-            ░░░░░░░░░░░░
-              ░░░░░░░░
-```
+<p align="center">
+  <img src="assets/slice-logo.svg" width="260" alt="SLICE logo — pizza slice with a blade">
+</p>
+
+<p align="center">
+  <img src="screenshots/slice-pad.png" width="500" alt="SLICE Pad — pizza-wheel clip launcher inside Ableton">
+  <br>
+  <em>SLICE Pad — click a slice to fire that channel's clip</em>
+</p>
+
 
 > **Splice gives you loops. SLICE writes the parts.**
 > A pizza slice with a blade — open-source generative MIDI for Ableton Live,
@@ -32,6 +30,18 @@ Splice is a sample library. SLICE is an agent that **composes inside your sessio
 - Hex-encoded wire format — binary-safe payloads.
 
 The sibling web app is called **CHOP**. Stay tuned.
+
+
+
+## Devices
+
+Two Max for Live devices ship together:
+
+- **`device/ClaudeBar.amxd`** — thin chat bar. Type prompts, Claude executes via tools.
+- **`device/SlicePad.amxd`** — pizza-wheel clip launcher. Each slice = one channel.
+  Click a slice → bridge fires that channel's clip via AbletonOSC. Built-in chat too.
+
+Drop either (or both) into your User Library MIDI Effects folder, then drag onto a MIDI track.
 
 ## What it does today
 

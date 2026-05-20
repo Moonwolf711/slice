@@ -297,9 +297,57 @@ def disconnect():
     log("disconnected")
 
 
+# --- track name -> index cache (rebuilt on demand via AbletonOSC) ---
+_TRACK_CACHE = {"names": None, "ts": 0}
+
+
+def _refresh_track_names():
+    if _TRACK_CACHE["names"] and time.time() - _TRACK_CACHE["ts"] < 30:
+        return _TRACK_CACHE["names"]
+    try:
+        helper = os.path.join(SLICE_ROOT, "bridge", "osc.py")
+        r = subprocess.run(["python", helper, "live/song/get/track_names"],
+                           capture_output=True, text=True, timeout=4)
+        data = json.loads(r.stdout)
+        names = data.get("args", [])
+        _TRACK_CACHE["names"] = names
+        _TRACK_CACHE["ts"] = time.time()
+        return names
+    except Exception as e:
+        log(f"track cache err: {e}")
+        return []
+
+
+def _fire_slice(name, clip):
+    names = _refresh_track_names()
+    try:
+        idx = names.index(name)
+    except ValueError:
+        emit("fireAck", f"track {name!r} not found")
+        return
+    try:
+        helper = os.path.join(SLICE_ROOT, "bridge", "osc.py")
+        subprocess.run(["python", helper, "live/clip/fire", str(idx), str(clip)],
+                       capture_output=True, timeout=3)
+        emit("fireAck", f"{name} -> idx {idx} clip {clip}")
+        log(f"FIRE {name} idx={idx} clip={clip}")
+    except Exception as e:
+        emit("fireAck", f"err: {e}")
+
+
 @sio.on("control", namespace=CFG["ns"])
 def on_control(data):
-    if (data or {}).get("header") != CFG["h_in"]:
+    header = (data or {}).get("header")
+    if header == "fireSlice":
+        try:
+            payload = json.loads(unhx((data.get("values") or [""])[0]))
+            threading.Thread(target=_fire_slice,
+                             args=(payload.get("name"), int(payload.get("clip", 0))),
+                             daemon=True).start()
+        except Exception as e:
+            log(f"fireSlice err: {e}")
+        return
+    if header != CFG["h_in"]:
         return
     prompt = " ".join(unhx(str(v)) for v in (data.get("values") or [])).strip()
     if not prompt:
